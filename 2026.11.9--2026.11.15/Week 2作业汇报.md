@@ -75,12 +75,12 @@
 - Merge：合并两个人的成绩，返回一个新的 `Student`（`Name` 用接收者的）。**合并结果和两个原对象必须互不影响。**
     
 
-```Go
-type Student struct {
-    Name   string
-    Scores []int // 记录若干项成绩
-}
-```
+	```Go
+	type Student struct {
+	    Name   string
+	    Scores []int // 记录若干项成绩
+	}
+	```
 
 ```go
 package main
@@ -440,67 +440,12 @@ func Sort(arr []Thing) {
 
 }
 ```
-    
+
+[[random_3.go]]
+
 6. 拓展题：只使用channel进行并发控制，交叉打印下面两个字符串（要求一个打印完，另一个会继续打印） "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "0123..." 得到："AB01CD23EF34..."（不会的话可以降低难度，使用其他的并发控制工具）
-```go
-package main
 
-import (
-	"fmt"
-	"sync"
-)
-
-func main() {
-	s1 := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-	s2 := "0123456789"
-
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	turn := 1 
-
-	
-	go func() {
-		defer wg.Done()
-		for i := 0; i < len(s1); i += 2 {
-			for {
-				mu.Lock()
-				if turn == 1 || i >= len(s2) { 
-					end := min(i+2, len(s1))
-					fmt.Print(s1[i:end])
-					turn = 2 // 交给对方
-					mu.Unlock()
-					break
-				}
-				mu.Unlock()
-			}
-		}
-	}()
-
-
-	go func() {
-		defer wg.Done()
-		for i := 0; i < len(s2); i += 2 {
-			for {
-				mu.Lock()
-				if turn == 2 || i >= len(s1) { 
-					end := min(i+2, len(s2))
-					fmt.Print(s2[i:end])
-					turn = 1 
-					mu.Unlock()
-					break
-				}
-				mu.Unlock()
-			}
-		}
-	}()
-
-	wg.Wait()
-	fmt.Println()
-}
-```
-
+[[ChannleConcurrence_2.go]]
 # 相关知识点
 ## sync 包
 1. sync 包里的核心结构体

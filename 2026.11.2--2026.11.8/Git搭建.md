@@ -128,12 +128,14 @@ git config --global credential.helper store
 3. 你敲了 git commit ➡️ 状态变为：已提交（干净了）
 4. 你再次打开文件改了几个字 ➡️ 状态变为：已修改（红）
 5. 你想把修改存下来，再敲 git add ➡️ 回到状态：已暂存（绿）...
-![[Pasted image 20261107201145.png]]
+
+![[attachments/Pasted image 20261107201145.png]]
 
 # 添加和提交文件
-![[Pasted image 20261107201407.png]]
+![[attachments/Pasted image 20261107201407.png]]
 
-![[Pasted image 20261107203303.png]]
+![[attachments/Pasted image 20261107203303.png]]
+
 
 🚀 完整流程代码总结（可以直接复制）
 
@@ -152,7 +154,7 @@ git status
 ```
 
 # git reset 回退版本
-![[Pasted image 20261107203604.png]]
+![[attachments/Pasted image 20261107203604.png]]
 
 命令的基本格式是：
 git reset --模式 目标版本的哈希值
