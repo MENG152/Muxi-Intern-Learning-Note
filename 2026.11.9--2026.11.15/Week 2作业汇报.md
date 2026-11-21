@@ -75,14 +75,14 @@
 - Merge：合并两个人的成绩，返回一个新的 `Student`（`Name` 用接收者的）。**合并结果和两个原对象必须互不影响。**
     
 
-	```Go
-	type Student struct {
-	    Name   string
-	    Scores []int // 记录若干项成绩
-	}
-	```
+```Go
+type Student struct {
+    Name   string
+    Scores []int // 记录若干项成绩
+}
+```
 
-```go
+```go fold
 package main
 
   
@@ -332,7 +332,20 @@ if len(consumeMSG) >= ConsumeNum {
           consumeMSG = consumeMSG[ConsumeNum:]
        } 
 ```
-- 主线程打开协程后没有暂停，继续执行下面的语句，
+- 主线程打开协程后没有暂停，继续执行下面的语句。如果主程序先于协程执行了，协程中的切片会报错导致panic
+
+- 第四个没问题得了，要改的话就是，在进闭包之前先把前面切下来，并且作为参数捕获进去，大概就是
+```go fold
+if len(consumeMSG) >= ConsumeNum {
+    batch := consumeMSG[:ConsumeNum:ConsumeNum]
+    consumeMSG = consumeMSG[ConsumeNum:]
+    lastConsumeTime = time.Now()
+    go func(m []MSG) {
+        ...
+    }(batch)
+} 
+```
+这样
 
 5. 使用for循环生成20个goroutine,每个goroutine随机休眠0~1000ms，并向一个channel传入随机数和goroutine编号(从1-20)，等待这些goroutine都生成完后，想办法给这些随机数**按照编号进行排序**(输出排序前和排序后的结果,要求不使用额外的空间存储这20个数据)
 ```go fold
@@ -370,6 +383,8 @@ func main() {
 
     var wg sync.WaitGroup
 
+    var c Thing
+
   
 
     for i := 1; i <= 20; i++ {
@@ -404,48 +419,56 @@ func main() {
 
     wg.Wait()
 
-    close(ch)
-
   
 
-    var arr []Thing
-
-    for thing := range ch {
-
-        arr = append(arr, thing)
-
-    }
-
-    fmt.Println("排序前", arr)
-
-    Sort(arr)
-
-}
+    fmt.Println("排序前")
 
   
-
-func Sort(arr []Thing) {
 
     for i := 0; i < 20; i++ {
 
-        for arr[i].ID != i+1 {
+        c = <-ch
 
-            arr[i], arr[arr[i].ID-1] = arr[arr[i].ID-1], arr[i]
+        fmt.Printf("ID is %d, NUM is %d.\n", c.ID, c.NUM)
+
+        ch <- c
+
+    }
+
+  
+
+    fmt.Println("排序后")
+
+  
+
+    for i := 0; i < 20; i++ {
+
+        for j := 0; j < 20-i; j++ {
+
+            t := <-ch
+
+            if t.ID == i+1 {
+
+                fmt.Printf("ID is %d, NUM is %d.\n", t.ID, t.NUM)
+
+                break
+
+            }
+
+            ch <- t
 
         }
 
     }
 
-    fmt.Println("排序后", arr)
+    close(ch)
 
 }
 ```
-
-[[random_3.go]]
-
+    
 6. 拓展题：只使用channel进行并发控制，交叉打印下面两个字符串（要求一个打印完，另一个会继续打印） "ABCDEFGHIJKLMNOPQRSTUVWXYZ" "0123..." 得到："AB01CD23EF34..."（不会的话可以降低难度，使用其他的并发控制工具）
 
-[[ChannleConcurrence_2.go]]
+
 # 相关知识点
 ## sync 包
 1. sync 包里的核心结构体
@@ -462,7 +485,81 @@ func Sort(arr []Thing) {
 2. 传递
 - 所有sync包里的结构体，绝对不能通过值传递，必须传指针
 
+## 用channel模拟Mutex和WaitGroup
+```go fold
+package main
 
+import (
+	"fmt"
+	"time"
+)
+
+// 定义一个基于 Channel 的锁
+type ChanMutex chan struct{}
+
+// 加锁：向通道发送数据。如果通道满了（容量为1，里面已经有令牌了），就会阻塞等待。
+func (m ChanMutex) Lock() {
+	m <- struct{}{}
+}
+
+// 解锁：从通道接收数据。相当于把令牌拿走，腾出空间让下一个协程可以加锁。
+func (m ChanMutex) Unlock() {
+	<-m
+}
+
+func main() {
+	// 初始化一个容量为 1 的 Channel 作为锁
+	mu := make(ChanMutex, 1)
+	count := 0
+
+	for i := 0; i < 5; i++ {
+		go func(id int) {
+			mu.Lock()         // 抢令牌
+			defer mu.Unlock() // 记得还令牌
+
+			// --- 临界区 ---
+			count++
+			fmt.Printf("协程 %d 修改了 count, 当前值: %d\n", id, count)
+			time.Sleep(100 * time.Millisecond) // 模拟业务耗时
+			// --------------
+		}(i)
+	}
+
+	time.Sleep(1 * time.Second) // 等待所有协程执行完毕
+	fmt.Println("最终 count:", count)
+}
+```
+
+```go fold
+package main
+
+import (
+	"fmt"
+	"time"
+)
+
+func main() {
+	taskNum := 5
+	// 创建一个无缓冲通道，用于接收任务完成通知
+	doneCh := make(chan struct{})
+
+	for i := 1; i <= taskNum; i++ {
+		go func(id int) {
+			time.Sleep(time.Duration(id*100) * time.Millisecond) // 模拟耗时
+			fmt.Printf("任务 %d 完成\n", id)
+			doneCh <- struct{}{} // 发送完成信号
+		}(i)
+	}
+
+	// 模拟 Wait()
+	// 我们非常清楚有 5 个任务，所以等待接收 5 次
+	for i := 0; i < taskNum; i++ {
+		<-doneCh // 如果没收到，主协程就会一直阻塞在这里
+	}
+
+	fmt.Println("所有任务执行完毕，主程序退出")
+}
+```
 ## time 包
 time 包主要解决四个问题：获取当前时间（Time）、计算时间差（Duration）、格式化输出、以及并发定时控制（Timer/Ticker）。
 
